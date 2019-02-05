@@ -17,6 +17,14 @@ object FieldSpec extends TestSuite {
   }
 }
 
+object FieldQuerySpec extends TestSuite {
+  val tests = Tests {
+    "object list" - {
+      TownField()
+    }
+  }
+}
+
 object MarketSpec extends TestSuite {
   val tests = Tests {
     "buy" - {
@@ -35,12 +43,12 @@ object PlayerSpec extends TestSuite {
   val tests = Tests {
     "payment" - {
       "currency lacked" - {
-        Player(PlayerId(), Inventory.empty, Wallet.empty)
+        Player(PlayerId(), Inventory.empty, Wallet.empty, Life(100))
           .payment(Bill(ItemId(), Currency(100)))
           .left.get ==> CurrencyLacked
       }
       "purchased" - {
-        Player(PlayerId(), Inventory.empty, Wallet(Currency(100)))
+        Player(PlayerId(), Inventory.empty, Wallet(Currency(100)), Life(100))
           .payment(Bill(ItemId(), Currency(100)))
           .right.get.inventory.size ==> 1
       }
@@ -52,8 +60,18 @@ object BattleSpec extends TestSuite {
   val tests = Tests {
     "player attacks monster" - {
       Monster(MonsterId(), Life(100))
-        .damaged(Attack(50))
-        .currentLife ==> 50
+        .damaged(Attack(51))
+        .currentLife ==> 49
+    }
+    "monster attacks player" - {
+      Player(PlayerId(), Inventory.empty, Wallet.empty, Life(100))
+        .damaged(Attack(51))
+        .currentLife ==> 49
+    }
+    "death of monster" - {
+      Monster(MonsterId(), Life(100))
+        .damaged(Attack(100))
+        .isDead ==> true
     }
   }
 }

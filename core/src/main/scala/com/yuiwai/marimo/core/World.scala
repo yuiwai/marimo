@@ -77,6 +77,7 @@ final case class MoveToCommand(to: FieldId)
 
 sealed trait Query
 sealed trait FieldQuery extends Query
+case object FieldObjectListQuery extends FieldQuery
 case object ProductListQuery extends FieldQuery
 
 sealed trait Event
@@ -105,11 +106,13 @@ final case class Treasure(items: Map[ItemId, Int])
 final case class TreasureBox(treasures: Seq[Treasure])
 
 
-final case class Player(playerId: PlayerId, inventory: Inventory, wallet: Wallet) {
+final case class Player(playerId: PlayerId, inventory: Inventory, wallet: Wallet, life: Life)
+  extends WithBattleStatus[Player] {
   def payment(bill: Bill): Either[PlayerError, Player] = wallet.paid(bill.price)
     .map { w =>
       copy(inventory = inventory.add(bill.itemId), wallet = w)
     }
+  def modifiedLife(f: Life => Life): Player = copy(life = f(life))
 }
 final case class PlayerId()
 sealed trait PlayerError
@@ -177,9 +180,8 @@ object Currency {
 }
 final case class Bill(itemId: ItemId, price: Currency)
 
-final case class Monster(monsterId: MonsterId, life: Life) {
-  def currentLife: Int = life.currentLife
-  def damaged(attack: Attack): Monster = copy(life = life - attack.damage)
+final case class Monster(monsterId: MonsterId, life: Life) extends WithBattleStatus[Monster] {
+  def modifiedLife(f: Life => Life): Monster = copy(life = f(life))
 }
 final case class MonsterId()
 
@@ -187,11 +189,26 @@ final case class Attack(damage: Int)
 final case class Life(currentLife: Int, maxLife: Int) {
   require(currentLife >= 0)
   def -(damage: Int): Life = copy(currentLife = (currentLife - damage).max(0))
+  def isDead: Boolean = !isAlive
+  def isAlive: Boolean = currentLife > 0
 }
 object Life {
   def apply(life: Int): Life = apply(life, life)
 }
+trait WithBattleStatus[T] {
+  val life: Life
+  def isDead: Boolean = life.isDead
+  def modifiedLife(f: Life => Life): T
+  def damaged(attack: Attack): T = modifiedLife(_ - attack.damage)
+  def currentLife: Int = life.currentLife
+}
+
+// TODO Services
+trait Service
+trait PlayerService extends Service
+trait FieldService extends Service
+trait ItemService extends Service
+trait MarketService extends Service
 
 
 trait ActivityStream
-
