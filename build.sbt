@@ -18,6 +18,16 @@ lazy val core = (project in file("core"))
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
+lazy val cli = (project in file("cli"))
+  .settings(
+    name := "marimo-cli",
+    libraryDependencies ++= Seq(
+      "com.lihaoyi" %% "fastparse" % "2.1.0",
+      "com.lihaoyi" %% "utest" % "0.6.6" % "test"
+    ),
+    testFrameworks += new TestFramework("utest.runner.Framework")
+  )
+
 lazy val fieldApi = (project in file("field-api"))
   .settings(
     libraryDependencies += lagomScaladslApi
