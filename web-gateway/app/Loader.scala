@@ -4,7 +4,7 @@ import com.lightbend.lagom.scaladsl.api.{LagomConfigComponent, ServiceAcl, Servi
 import com.lightbend.lagom.scaladsl.client.LagomServiceClientComponents
 import com.lightbend.lagom.scaladsl.devmode.LagomDevModeComponents
 import com.softwaremill.macwire._
-import controllers.Main
+import controllers.{AssetsComponents, Main}
 import play.api.ApplicationLoader.Context
 import play.api.libs.ws.ahc.AhcWSComponents
 import play.api.{ApplicationLoader, BuiltInComponentsFromContext, Mode}
@@ -16,6 +16,7 @@ import scala.concurrent.ExecutionContext
 
 abstract class WebGateway(context: ApplicationLoader.Context) extends BuiltInComponentsFromContext(context)
   with HttpFiltersComponents
+  with AssetsComponents
   with AhcWSComponents
   with LagomConfigComponent
   with LagomServiceClientComponents {

@@ -8,6 +8,6 @@ class Main(controllerComponents: ControllerComponents)
   (implicit ec: ExecutionContext) extends AbstractController(controllerComponents) {
 
   def index = Action { _ =>
-    Ok("Hello Marimo")
+    Ok(views.html.main())
   }
 }

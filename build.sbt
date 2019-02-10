@@ -1,3 +1,5 @@
+import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
+
 scalaVersion in ThisBuild := "2.12.7"
 version in ThisBuild := "0.1.0"
 scalacOptions in ThisBuild ++= Seq(
@@ -18,6 +20,10 @@ lazy val core = (project in file("core"))
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
+lazy val shared = crossProject(JSPlatform, JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("shared"))
+
 lazy val cli = (project in file("cli"))
   .settings(
     name := "marimo-cli",
@@ -28,6 +34,16 @@ lazy val cli = (project in file("cli"))
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
 
+lazy val js = (project in file("js"))
+  .settings(
+    name := "marimo-js",
+    scalaJSUseMainModuleInitializer := true,
+    libraryDependencies ++= Seq(
+      "org.scala-js" %%% "scalajs-dom" % "0.9.2"
+    )
+  )
+  .enablePlugins(ScalaJSPlugin, ScalaJSWeb)
+
 lazy val fieldApi = (project in file("field-api"))
   .settings(
     libraryDependencies += lagomScaladslApi
@@ -37,6 +53,10 @@ lazy val webGateway = (project in file("web-gateway"))
   .enablePlugins(PlayScala && LagomPlay)
   .settings(
     libraryDependencies ++= Seq(
-      macwire
-    )
+      macwire,
+      "com.vmunier" %% "scalajs-scripts" % "1.1.2"
+    ),
+    scalaJSProjects := Seq(js),
+    pipelineStages in Assets := Seq(scalaJSPipeline),
+    compile in Compile := ((compile in Compile) dependsOn scalaJSPipeline).value
   )
