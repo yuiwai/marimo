@@ -13,6 +13,7 @@ val macwire = "com.softwaremill.macwire" %% "macros" % "2.3.1" % "provided"
 
 lazy val root = (project in file("."))
   .aggregate(
+    playerApi, playerImpl,
     fieldApi, fieldImpl,
     webGateway
   )
@@ -48,6 +49,25 @@ lazy val js = (project in file("js"))
   )
   .enablePlugins(ScalaJSPlugin, ScalaJSWeb)
 
+lazy val playerApi = (project in file("player-api"))
+  .settings(
+    name := "player-api",
+    libraryDependencies ++= Seq(
+      lagomScaladslApi,
+      playJsonDerivedCodecs
+    )
+  )
+
+lazy val playerImpl = (project in file("player-impl"))
+  .settings(
+    name := "player-impl",
+    libraryDependencies ++= Seq(
+      macwire
+    )
+  )
+  .enablePlugins(LagomScala)
+  .dependsOn(playerApi)
+
 lazy val fieldApi = (project in file("field-api"))
   .settings(
     name := "field-api",
@@ -70,8 +90,9 @@ lazy val fieldImpl = (project in file("field-impl"))
 
 lazy val webGateway = (project in file("web-gateway"))
   .enablePlugins(PlayScala && LagomPlay)
-  .dependsOn(fieldApi)
+  .dependsOn(playerApi, fieldApi)
   .settings(
+    name := "web-gateway",
     libraryDependencies ++= Seq(
       macwire,
       "com.vmunier" %% "scalajs-scripts" % "1.1.2"
