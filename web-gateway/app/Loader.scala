@@ -4,6 +4,7 @@ import com.lightbend.lagom.scaladsl.api.{LagomConfigComponent, ServiceAcl, Servi
 import com.lightbend.lagom.scaladsl.client.LagomServiceClientComponents
 import com.lightbend.lagom.scaladsl.devmode.LagomDevModeComponents
 import com.softwaremill.macwire._
+import com.yuiwai.marimo.field.api.FieldService
 import controllers.{AssetsComponents, Main}
 import play.api.ApplicationLoader.Context
 import play.api.libs.ws.ahc.AhcWSComponents
@@ -14,7 +15,8 @@ import router.Routes
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 
-abstract class WebGateway(context: ApplicationLoader.Context) extends BuiltInComponentsFromContext(context)
+abstract class WebGateway(context: ApplicationLoader.Context)
+  extends BuiltInComponentsFromContext(context)
   with HttpFiltersComponents
   with AssetsComponents
   with AhcWSComponents
@@ -30,6 +32,7 @@ abstract class WebGateway(context: ApplicationLoader.Context) extends BuiltInCom
     val prefix = "/"
     wire[Routes]
   }
+  lazy val fieldService = serviceClient.implement[FieldService]
   override implicit lazy val executionContext: ExecutionContext = actorSystem.dispatcher
   lazy val main = wire[Main]
 }

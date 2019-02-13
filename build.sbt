@@ -8,10 +8,14 @@ scalacOptions in ThisBuild ++= Seq(
   "-unchecked"
 )
 
+val playJsonDerivedCodecs = "org.julienrf" %% "play-json-derived-codecs" % "4.0.0"
 val macwire = "com.softwaremill.macwire" %% "macros" % "2.3.1" % "provided"
 
 lazy val root = (project in file("."))
-  .aggregate(webGateway)
+  .aggregate(
+    fieldApi, fieldImpl,
+    webGateway
+  )
 
 lazy val core = (project in file("core"))
   .settings(
@@ -46,11 +50,27 @@ lazy val js = (project in file("js"))
 
 lazy val fieldApi = (project in file("field-api"))
   .settings(
-    libraryDependencies += lagomScaladslApi
+    name := "field-api",
+    libraryDependencies ++= Seq(
+      lagomScaladslApi,
+      playJsonDerivedCodecs
+    )
   )
+
+lazy val fieldImpl = (project in file("field-impl"))
+  .settings(
+    name := "field-impl",
+    libraryDependencies ++= Seq(
+      macwire
+    )
+  )
+  .enablePlugins(LagomScala)
+  .dependsOn(fieldApi)
+
 
 lazy val webGateway = (project in file("web-gateway"))
   .enablePlugins(PlayScala && LagomPlay)
+  .dependsOn(fieldApi)
   .settings(
     libraryDependencies ++= Seq(
       macwire,
