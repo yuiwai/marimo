@@ -1,9 +1,14 @@
 package com.yuiwai.marimo.js
 
-import org.scalajs.dom
+import org.scalajs.dom.ext.Ajax
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Main {
   def main(args: Array[String]): Unit = {
-    dom.console.log("running main")
+    Ajax
+      .get("/fieldObjects")
+      .foreach { r =>
+        println(r)
+      }
   }
 }
