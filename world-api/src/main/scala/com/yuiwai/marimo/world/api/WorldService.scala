@@ -19,7 +19,7 @@ trait WorldService extends Service {
   }
 }
 
-final case class WorldInfo(worldId: Int)
+final case class WorldInfo(worldId: String)
 object WorldInfo {
   implicit val format: OFormat[WorldInfo] = Json.format[WorldInfo]
 }

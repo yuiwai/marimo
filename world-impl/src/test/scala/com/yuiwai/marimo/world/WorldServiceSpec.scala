@@ -7,7 +7,7 @@ import com.lightbend.lagom.scaladsl.testkit.ServiceTest
 import com.yuiwai.marimo.world.api.WorldService
 
 class WorldServiceSpec extends AsyncWordSpec with Matchers with BeforeAndAfterAll {
-  lazy val server = ServiceTest.startServer(ServiceTest.defaultSetup) { ctx =>
+  lazy val server = ServiceTest.startServer(ServiceTest.defaultSetup.withCassandra()) { ctx =>
     new WorldApplication(ctx) with LocalServiceLocator
   }
   lazy val client = server.serviceClient.implement[WorldService]

@@ -10,18 +10,22 @@ class WorldEntity extends PersistentEntity {
   override type State = WorldState
   override def initialState: WorldState = WorldState()
   override def behavior: Behavior = Actions()
+    .onCommand[Create, Done] {
+    case (_, ctx, _) =>
+      ctx.thenPersist(Created()) { _ => ctx.reply(Done) }
+  }
     .onCommand[RegisterPlayer, Done] {
     case (_, ctx, _) =>
-      ctx.thenPersist(PlayerRegistered()) { ev =>
-        ctx.reply(Done)
-      }
+      ctx.thenPersist(PlayerRegistered()) { ev => ctx.reply(Done) }
   }
 }
 
 sealed trait WorldCommand
+final case class Create() extends WorldCommand with ReplyType[Done]
 final case class RegisterPlayer() extends WorldCommand with ReplyType[Done]
 
 sealed trait WorldEvent
+final case class Created() extends WorldEvent
 final case class PlayerRegistered() extends WorldEvent
 
 final case class WorldState()
