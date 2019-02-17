@@ -28,6 +28,8 @@ lazy val core = (project in file("core"))
 lazy val shared = crossProject(JSPlatform, JVMPlatform)
   .crossType(CrossType.Pure)
   .in(file("shared"))
+lazy val sharedJVM = shared.jvm
+lazy val sharedJS = shared.js
 
 lazy val cli = (project in file("cli"))
   .settings(
@@ -44,9 +46,11 @@ lazy val js = (project in file("js"))
     name := "marimo-js",
     scalaJSUseMainModuleInitializer := true,
     libraryDependencies ++= Seq(
-      "org.scala-js" %%% "scalajs-dom" % "0.9.2"
+      "org.scala-js" %%% "scalajs-dom" % "0.9.2",
+      "io.suzaku" %%% "boopickle" % "1.3.0"
     )
   )
+  .dependsOn(sharedJS)
   .enablePlugins(ScalaJSPlugin, ScalaJSWeb)
 
 lazy val playerApi = (project in file("player-api"))
@@ -90,12 +94,13 @@ lazy val fieldImpl = (project in file("field-impl"))
 
 lazy val webGateway = (project in file("web-gateway"))
   .enablePlugins(PlayScala && LagomPlay)
-  .dependsOn(playerApi, fieldApi)
+  .dependsOn(playerApi, fieldApi, sharedJVM)
   .settings(
     name := "web-gateway",
     libraryDependencies ++= Seq(
       macwire,
-      "com.vmunier" %% "scalajs-scripts" % "1.1.2"
+      "com.vmunier" %% "scalajs-scripts" % "1.1.2",
+      "io.suzaku" %% "boopickle" % "1.3.0"
     ),
     scalaJSProjects := Seq(js),
     pipelineStages in Assets := Seq(scalaJSPipeline),
