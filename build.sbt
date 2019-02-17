@@ -10,9 +10,11 @@ scalacOptions in ThisBuild ++= Seq(
 
 val playJsonDerivedCodecs = "org.julienrf" %% "play-json-derived-codecs" % "4.0.0"
 val macwire = "com.softwaremill.macwire" %% "macros" % "2.3.1" % "provided"
+val scalaTest = "org.scalatest" %% "scalatest" % "3.0.1" % "test"
 
 lazy val root = (project in file("."))
   .aggregate(
+    worldApi, worldImpl,
     playerApi, playerImpl,
     fieldApi, fieldImpl,
     webGateway
@@ -52,6 +54,29 @@ lazy val js = (project in file("js"))
   )
   .dependsOn(sharedJS)
   .enablePlugins(ScalaJSPlugin, ScalaJSWeb)
+
+lazy val worldApi = (project in file("world-api"))
+  .settings(
+    name := "world-api",
+    libraryDependencies ++= Seq(
+      lagomScaladslApi,
+      playJsonDerivedCodecs
+    )
+  )
+
+lazy val worldImpl = (project in file("world-impl"))
+  .settings(lagomForkedTestSettings: _*)
+  .settings(
+    name := "world-impl",
+    libraryDependencies ++= Seq(
+      macwire,
+      lagomScaladslPersistenceCassandra,
+      lagomScaladslTestKit,
+      scalaTest
+    )
+  )
+  .enablePlugins(LagomScala)
+  .dependsOn(worldApi)
 
 lazy val playerApi = (project in file("player-api"))
   .settings(
