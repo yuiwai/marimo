@@ -49,11 +49,16 @@ lazy val js = (project in file("js"))
     scalaJSUseMainModuleInitializer := true,
     libraryDependencies ++= Seq(
       "org.scala-js" %%% "scalajs-dom" % "0.9.2",
-      "io.suzaku" %%% "boopickle" % "1.3.0"
+      "io.suzaku" %%% "boopickle" % "1.3.0",
+      "com.github.japgolly.scalajs-react" %%% "core" % "1.3.1"
+    ),
+    npmDependencies in Compile ++= Seq(
+      "react" -> "16.5.1",
+      "react-dom" -> "16.5.1"
     )
   )
   .dependsOn(sharedJS)
-  .enablePlugins(ScalaJSPlugin, ScalaJSWeb)
+  .enablePlugins(ScalaJSPlugin, ScalaJSWeb, ScalaJSBundlerPlugin)
 
 lazy val worldApi = (project in file("world-api"))
   .settings(
@@ -118,7 +123,7 @@ lazy val fieldImpl = (project in file("field-impl"))
 
 
 lazy val webGateway = (project in file("web-gateway"))
-  .enablePlugins(PlayScala && LagomPlay)
+  .enablePlugins(PlayScala && LagomPlay, WebScalaJSBundlerPlugin)
   .dependsOn(playerApi, fieldApi, sharedJVM)
   .settings(
     name := "web-gateway",

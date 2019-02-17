@@ -2,18 +2,22 @@ package com.yuiwai.marimo.js
 
 import java.nio.ByteBuffer
 
+import boopickle.Default._
+import com.yuiwai.marimo.shared.FieldObject
+import org.scalajs.dom
 import org.scalajs.dom.ext.Ajax
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import boopickle.Default._
-import com.yuiwai.marimo.shared.FieldObject
-
 import scala.concurrent.Future
 import scala.scalajs.js.typedarray.{ArrayBuffer, TypedArrayBuffer}
 
 object Main extends ApiCall {
   def main(args: Array[String]): Unit = {
-    fieldObjects.foreach(println)
+    val main = MainView.Component
+    main(MainView.Props(_ => fieldObjects.foreach(println)))
+      .renderIntoDOM(
+        dom.document.getElementById("react-stage")
+      )
   }
 }
 
