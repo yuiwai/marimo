@@ -123,7 +123,7 @@ lazy val fieldImpl = (project in file("field-impl"))
 
 
 lazy val webGateway = (project in file("web-gateway"))
-  .enablePlugins(PlayScala && LagomPlay, WebScalaJSBundlerPlugin)
+  .enablePlugins(PlayScala, LagomPlay, WebScalaJSBundlerPlugin, SbtReactiveAppPlugin)
   .dependsOn(playerApi, fieldApi, sharedJVM)
   .settings(
     name := "web-gateway",

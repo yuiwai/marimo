@@ -3,6 +3,7 @@ package loader
 import com.lightbend.lagom.scaladsl.api.{LagomConfigComponent, ServiceAcl, ServiceInfo}
 import com.lightbend.lagom.scaladsl.client.LagomServiceClientComponents
 import com.lightbend.lagom.scaladsl.devmode.LagomDevModeComponents
+import com.lightbend.rp.servicediscovery.lagom.scaladsl.LagomServiceLocatorComponents
 import com.softwaremill.macwire._
 import com.yuiwai.marimo.field.api.FieldService
 import controllers.{AssetsComponents, Main}
@@ -42,7 +43,6 @@ class WebGatewayLoader extends ApplicationLoader {
     case Mode.Dev =>
       (new WebGateway(context) with LagomDevModeComponents).application
     case _ =>
-      // FIXME Product Mode
-      (new WebGateway(context) with LagomDevModeComponents).application
+      (new WebGateway(context) with LagomServiceLocatorComponents).application
   }
 }
