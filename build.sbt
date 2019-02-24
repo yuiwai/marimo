@@ -33,15 +33,26 @@ lazy val shared = crossProject(JSPlatform, JVMPlatform)
 lazy val sharedJVM = shared.jvm
 lazy val sharedJS = shared.js
 
-lazy val cli = (project in file("cli"))
+lazy val cli = crossProject(JSPlatform, JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("cli"))
   .settings(
-    name := "marimo-cli",
+    name := "marimo-cli"
+  )
+  .jvmSettings(
     libraryDependencies ++= Seq(
       "com.lihaoyi" %% "fastparse" % "2.1.0",
       "com.lihaoyi" %% "utest" % "0.6.6" % "test"
     ),
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
+  .jsSettings(
+    libraryDependencies ++= Seq(
+      "com.lihaoyi" %%% "fastparse" % "2.1.0",
+    )
+  )
+lazy val cliJVM = cli.jvm
+lazy val cliJS = cli.js
 
 lazy val js = (project in file("js"))
   .settings(
@@ -57,7 +68,7 @@ lazy val js = (project in file("js"))
       "react-dom" -> "16.5.1"
     )
   )
-  .dependsOn(sharedJS)
+  .dependsOn(sharedJS, cliJS)
   .enablePlugins(ScalaJSPlugin, ScalaJSWeb, ScalaJSBundlerPlugin)
 
 lazy val worldApi = (project in file("world-api"))
