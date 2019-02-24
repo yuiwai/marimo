@@ -3,9 +3,14 @@ package com.yuiwai.marimo.cli
 object Cmd {
   def apply(name: String): Cmd = Cmd(name, Nil)
   def apply(name: String, options: => Seq[Opt]): Cmd = Cmd(CmdName(name), options)
-  def parse(str: String)(implicit cmdSet: CmdSet): Either[ParseError, Cmd] = parseImpl(str)
-  private def parseImpl(str: String): Either[ParseError, Cmd] = {
-    Right(Cmd(CmdName(str), Nil))
+  def parse(str: String)(implicit cmdSet: CmdSet): Either[ParseError, CmdLike] = parseImpl(str)
+  private def parseImpl(str: String): Either[ParseError, CmdLike] = {
+    import fastparse.{parse => fastParse, Parsed}
+    val parser = new Parser {}
+    fastParse(str, parser.piped(_)) match {
+      case Parsed.Success(piped, _) => Right(piped)
+      case Parsed.Failure(_, _, _) => Left(SyntaxError)
+    }
   }
 }
 
@@ -31,6 +36,9 @@ trait Parser {
 sealed trait ParseError {
   def cmd: PartialCmd
 }
+case object SyntaxError extends ParseError {
+  def cmd: PartialCmd = PartialCmd.empty
+}
 
 sealed trait Elem {
   def isPartial: Boolean
@@ -39,8 +47,11 @@ sealed trait Elem {
 sealed trait CmdLike extends Elem {
   val name: CmdName
 }
-final case class PartialCmd(name: CmdName) extends CmdLike {
+final case class PartialCmd(name: CmdName, options: Seq[Opt] = Seq.empty) extends CmdLike {
   val isPartial: Boolean = true
+}
+object PartialCmd {
+  lazy val empty = PartialCmd(CmdName(""))
 }
 final case class Cmd(name: CmdName, options: Seq[Opt]) extends CmdLike {
   def isPartial: Boolean = options.exists(_.isPartial)

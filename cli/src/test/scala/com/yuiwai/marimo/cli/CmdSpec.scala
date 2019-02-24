@@ -6,10 +6,8 @@ object CmdSpec extends TestSuite {
   val tests = Tests {
     implicit val cmds = CmdSet(Seq.empty)
     "parse" - {
-      Cmd.parse("foo").right.get ==> Cmd("foo")
-
+      Cmd.parse("foo").right.get ==> Piped(Seq(Cmd("foo")))
       "required option" - {
-
       }
     }
   }
