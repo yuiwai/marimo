@@ -14,10 +14,14 @@ import scala.scalajs.js.typedarray.{ArrayBuffer, TypedArrayBuffer}
 object Main extends ApiCall {
   def main(args: Array[String]): Unit = {
     val main = MainView.Component
-    main(MainView.Props(_ => fieldObjects.foreach(println)))
+    main(MainView.Props(runCommandHandler))
       .renderIntoDOM(
         dom.document.getElementById("react-stage")
       )
+  }
+  def runCommandHandler(str: String): Unit = {
+    Commands.parse(str)
+    // fieldObjects.foreach(println)
   }
 }
 
