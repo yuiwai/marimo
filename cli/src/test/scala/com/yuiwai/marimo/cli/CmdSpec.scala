@@ -6,8 +6,52 @@ object CmdSpec extends TestSuite {
   val tests = Tests {
     implicit val cmds = CmdSet(Seq.empty)
     "parse" - {
-      Cmd.parse("foo").right.get ==> Piped(Seq(Cmd("foo")))
-      "required option" - {
+      "valid command name" - {
+        Cmd.parse("foo").right.get ==> Piped(Seq(Cmd("foo")))
+      }
+      "invalid command name" - {
+        // Cmd.parse("var").left.get
+      }
+      "required option without param" - {
+      }
+      "required option with param" - {
+      }
+    }
+  }
+}
+
+object AbstractCmdSpec extends TestSuite {
+  val tests = Tests {
+    "lift" - {
+      "without required option" - {
+        implicit val cmdSet = CmdSet(
+          Seq(
+            CmdDef(
+              CmdName("foo"),
+              Seq(
+                OptDef(OptName("f")),
+                OptDef(OptName("b"), withParam = true)
+              )
+            )
+          )
+        )
+        AbstractCmd("foo").lift ==> Cmd("foo")
+        AbstractCmd("foo", Seq("-f")).lift ==> Cmd("foo", Seq(Opt("f")))
+        AbstractCmd("foo", Seq("-b", "bar")).lift ==> Cmd("foo", Seq(Opt("b", "bar")))
+      }
+      "with required option" - {
+        implicit val cmdSet: CmdSet = CmdSet(
+          Seq(
+            CmdDef(
+              CmdName("foo"),
+              Seq(
+                OptDef(OptName("f"), require = true)
+              )
+            )
+          )
+        )
+        AbstractCmd("foo").lift ==> PartialCmd("foo").withError(RequiredOptError())
+        AbstractCmd("foo", Seq("-f")).lift ==> Cmd("foo", Seq(Opt("f")))
       }
     }
   }
@@ -20,7 +64,9 @@ object ParserSpec extends TestSuite {
     import fastparse._
     "cmdName" - {
       def valid(name: String) = parse(name, cmdName(_)).get.value ==> CmdName(name)
+
       def invalid(input: String) = parse(input, cmdName(_)).isSuccess ==> false
+
       valid("foo")
       valid("foo1")
       valid("FOO")
@@ -31,7 +77,9 @@ object ParserSpec extends TestSuite {
       def valid(input: String, name: String, value: String, isPartial: Boolean = false) = {
         parse(input, opt(_)).get.value ==> Opt(name, value, isPartial)
       }
+
       def invalid(input: String) = parse(input, opt(_)).isSuccess ==> false
+
       invalid("")
       invalid("f")
       invalid("foo")
@@ -61,4 +109,3 @@ object ParserSpec extends TestSuite {
     }
   }
 }
-
