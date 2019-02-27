@@ -24,7 +24,7 @@ object AbstractCmdSpec extends TestSuite {
   val tests = Tests {
     "lift" - {
       "without required option" - {
-        implicit val cmdSet = CmdSet(
+        implicit val cmdSet: CmdSet = CmdSet(
           Seq(
             CmdDef(
               CmdName("foo"),
@@ -38,6 +38,15 @@ object AbstractCmdSpec extends TestSuite {
         AbstractCmd("foo").lift ==> Cmd("foo")
         AbstractCmd("foo", Seq("-f")).lift ==> Cmd("foo", Seq(Opt("f")))
         AbstractCmd("foo", Seq("-b", "bar")).lift ==> Cmd("foo", Seq(Opt("b", "bar")))
+        AbstractCmd("foo", Seq("-f", "-b", "bar")).lift ==> Cmd("foo", Seq(Opt("f"), Opt("b", "bar")))
+        AbstractCmd("foo", Seq("-b", "bar", "-f")).lift ==> Cmd("foo", Seq(Opt("b", "bar"), Opt("f")))
+        AbstractCmd("foo", Seq("-b")).lift ==> PartialCmd("foo")
+          .withOpt(PartialOpt("b", ParamNotFoundError))
+          .withError(ParamNotFoundError)
+        AbstractCmd("foo", Seq("-f", "-b")).lift ==> PartialCmd("foo")
+          .withOpt(Opt("f"))
+          .withOpt(PartialOpt("b", ParamNotFoundError))
+          .withError(ParamNotFoundError)
       }
       "with required option" - {
         implicit val cmdSet: CmdSet = CmdSet(
@@ -45,13 +54,15 @@ object AbstractCmdSpec extends TestSuite {
             CmdDef(
               CmdName("foo"),
               Seq(
-                OptDef(OptName("f"), require = true)
+                OptDef(OptName("f"), require = true),
+                OptDef(OptName("b"))
               )
             )
           )
         )
         AbstractCmd("foo").lift ==> PartialCmd("foo").withError(RequiredOptError())
         AbstractCmd("foo", Seq("-f")).lift ==> Cmd("foo", Seq(Opt("f")))
+        AbstractCmd("foo", Seq("-f", "-b")).lift ==> Cmd("foo", Seq(Opt("f"), Opt("b")))
       }
     }
   }
