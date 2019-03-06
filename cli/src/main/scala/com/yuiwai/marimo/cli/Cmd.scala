@@ -4,16 +4,16 @@ object Cmd {
   def apply(name: String): Cmd = Cmd(name, Nil)
   def apply(name: String, options: => Seq[OptLike]): Cmd = Cmd(CmdName(name), options)
   def parse(str: String)(implicit cmdSet: CmdSet): Either[ParseError, CmdLike] = {
-    parseImpl(str) map {
+    parseImpl(str).map(_.lift).map {
       case Piped(commands) => Piped(commands)
       case cmdLike: CmdLike => cmdLike
     }
   }
-  private def parseImpl(str: String): Either[ParseError, CmdLike] = {
+  private def parseImpl(str: String): Either[ParseError, AbstractCmd] = {
     import fastparse.{parse => fastParse, Parsed}
     val parser = new Parser {}
-    fastParse(str, parser.piped(_)) match {
-      case Parsed.Success(piped, _) => Right(piped)
+    fastParse(str, parser.abstractCmd(_)) match {
+      case Parsed.Success(abstractCmd, _) => Right(abstractCmd)
       case Parsed.Failure(_, _, _) => Left(SyntaxError)
     }
   }
@@ -29,26 +29,23 @@ object AbstractCmd {
 
 trait Parser {
   import fastparse._, NoWhitespace._
-  def ws[_: P] = P(CharIn(" ").rep)
-  def piped[_: P] = P(cmd ~ (ws.? ~ "|" ~ ws.? ~ cmd).rep).map {
+  def ws[_: P]: P[Unit] = P(CharIn(" ").rep)
+  def abstractCmd[_: P]: P[AbstractCmd] = P(cmdName ~ (ws ~ arg).rep ~ End).map {
+    case (cmdName: CmdName, args) => AbstractCmd(cmdName, args)
+  }
+  /* def piped[_: P] = P(cmd ~ (ws.? ~ "|" ~ ws.? ~ cmd).rep).map {
     case (x, xs) => Piped(x +: xs)
-  }
-  def cmd[_: P] = P(cmdName ~ ws.? ~ opts).map {
-    case (name, opts) => Cmd(name, opts)
-  }
-  def cmdName[_: P] = P((CharIn("a-zA-Z") ~ CharIn("a-zA-Z0-9").rep).!).map(CmdName)
-  def opts[_: P] = P((opt ~ ws.?).rep)
-  def opt[_: P] = P(shortOpt | longOpt).map {
-    case (name, value) => Opt(OptName(name), OptValue(value.getOrElse("")), isPartial = false)
-  }
-  def shortOpt[_: P] = P("-" ~ CharIn("a-zA-Z").! ~ (ws ~ optV).?)
-  def longOpt[_: P] = P("--" ~ (CharIn("a-zA-Z") ~ CharIn("a-zA-Z0-9").rep).! ~ (ws ~ optV).?)
-  def optV[_: P] = P(CharsWhile(_ != ' ')).!
+  } */
+  def cmdName[_: P]: P[CmdName] = P((CharIn("a-zA-Z") ~ CharIn("a-zA-Z0-9").rep).!).map(CmdName)
+  def arg[_: P]: P[String] = P(CharsWhile(_ != ' ')).!
 }
 
 sealed trait ParseError
 case object SyntaxError extends ParseError
-case object UnknownCmdError extends ParseError
+final case class UnknownCmdError(cmdName: CmdName) extends ParseError
+object UnknownCmdError {
+  def apply(cmdName: => String): UnknownCmdError = apply(CmdName(cmdName))
+}
 final case class RequiredOptError() extends ParseError
 case object ParamNotFoundError extends ParseError
 
@@ -99,10 +96,10 @@ object Opt {
 final case class OptName(name: String)
 final case class OptValue(value: String)
 
-final case class CmdSet(cmds: Seq[CmdDef]) {
-  def lift(cmdName: CmdName, args: Seq[String]): CmdLike = cmds.find(_.name == cmdName) match {
+final case class CmdSet(cmdDefs: Seq[CmdDef]) {
+  def lift(cmdName: CmdName, args: Seq[String]): CmdLike = cmdDefs.find(_.name == cmdName) match {
     case Some(cmdDef) => cmdDef.lift(args)
-    case _ => PartialCmd(cmdName)
+    case _ => PartialCmd(cmdName).withError(UnknownCmdError(cmdName))
   }
 }
 final case class CmdDef(name: CmdName, opts: Seq[OptDef]) {
@@ -124,6 +121,9 @@ final case class CmdDef(name: CmdName, opts: Seq[OptDef]) {
       case _ => PartialCmd(name)
     }
   }
+}
+object CmdDef {
+  def apply(cmdName: String): CmdDef = CmdDef(CmdName(cmdName), Seq.empty)
 }
 final case class OptDef(name: OptName, withParam: Boolean = false, require: Boolean = false) {
   def lift(head: String, tail: Seq[String]): (OptLike, Seq[String]) =
