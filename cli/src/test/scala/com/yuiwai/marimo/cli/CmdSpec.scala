@@ -18,6 +18,9 @@ object CmdSpec extends TestSuite {
       }
       "required option with param" - {
       }
+      "with arguments" - {
+        Cmd.parse("foo bar baz").right.get ==> Cmd("foo", Seq.empty, Seq("bar", "baz"))
+      }
     }
   }
 }
@@ -29,10 +32,10 @@ object AbstractCmdSpec extends TestSuite {
         implicit val cmdSet: CmdSet = CmdSet(
           Seq(
             CmdDef(
-              CmdName("foo"),
+              "foo",
               Seq(
-                OptDef(OptName("f")),
-                OptDef(OptName("b"), withParam = true)
+                OptDef("f"),
+                OptDef("b", withParam = true)
               )
             )
           )
@@ -54,10 +57,10 @@ object AbstractCmdSpec extends TestSuite {
         implicit val cmdSet: CmdSet = CmdSet(
           Seq(
             CmdDef(
-              CmdName("foo"),
+              "foo",
               Seq(
-                OptDef(OptName("f"), require = true),
-                OptDef(OptName("b"))
+                OptDef("f", require = true),
+                OptDef("b")
               )
             )
           )
@@ -76,7 +79,7 @@ object ParserSpec extends TestSuite {
     import parser._
     import fastparse._
     "cmdName" - {
-      def valid(name: String): Unit = parse(name, cmdName(_)).get.value ==> CmdName(name)
+      def valid(name: String): Unit = parse(name, cmdName(_)).get.value ==> name
 
       def invalid(input: String): Unit = parse(input, cmdName(_)).isSuccess ==> false
 

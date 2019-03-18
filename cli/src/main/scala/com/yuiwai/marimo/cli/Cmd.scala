@@ -2,7 +2,6 @@ package com.yuiwai.marimo.cli
 
 object Cmd {
   def apply(name: String): Cmd = Cmd(name, Nil)
-  def apply(name: String, options: => Seq[OptLike]): Cmd = Cmd(CmdName(name), options)
   def parse(str: String)(implicit cmdSet: CmdSet): Either[ParseError, CmdLike] = {
     parseImpl(str).map(_.lift).map {
       case Piped(commands) => Piped(commands)
@@ -19,33 +18,29 @@ object Cmd {
   }
 }
 
-final case class AbstractCmd(cmdName: CmdName, args: Seq[String]) {
-  def lift(implicit cmdSet: CmdSet): CmdLike = cmdSet.lift(cmdName, args)
+final case class AbstractCmd(name: String, inputs: Seq[String]) {
+  def lift(implicit cmdSet: CmdSet): CmdLike = cmdSet.lift(name, inputs)
 }
 object AbstractCmd {
-  def apply(cmdName: String): AbstractCmd = AbstractCmd(CmdName(cmdName), Seq.empty)
-  def apply(cmdName: String, args: => Seq[String]): AbstractCmd = AbstractCmd(CmdName(cmdName), args)
+  def apply(name: String): AbstractCmd = AbstractCmd(name, Seq.empty)
 }
 
 trait Parser {
   import fastparse._, NoWhitespace._
   def ws[_: P]: P[Unit] = P(CharIn(" ").rep)
   def abstractCmd[_: P]: P[AbstractCmd] = P(cmdName ~ (ws ~ arg).rep ~ End).map {
-    case (cmdName: CmdName, args) => AbstractCmd(cmdName, args)
+    case (name: String, args) => AbstractCmd(name, args)
   }
   /* def piped[_: P] = P(cmd ~ (ws.? ~ "|" ~ ws.? ~ cmd).rep).map {
     case (x, xs) => Piped(x +: xs)
   } */
-  def cmdName[_: P]: P[CmdName] = P((CharIn("a-zA-Z") ~ CharIn("a-zA-Z0-9").rep).!).map(CmdName)
+  def cmdName[_: P]: P[String] = P((CharIn("a-zA-Z") ~ CharIn("a-zA-Z0-9").rep).!)
   def arg[_: P]: P[String] = P(CharsWhile(_ != ' ')).!
 }
 
 sealed trait ParseError
 case object SyntaxError extends ParseError
-final case class UnknownCmdError(cmdName: CmdName) extends ParseError
-object UnknownCmdError {
-  def apply(cmdName: => String): UnknownCmdError = apply(CmdName(cmdName))
-}
+final case class UnknownCmdError(name: String) extends ParseError
 final case class RequiredOptError() extends ParseError
 case object ParamNotFoundError extends ParseError
 
@@ -54,10 +49,10 @@ sealed trait Elem {
 }
 
 sealed trait CmdLike extends Elem {
-  val name: CmdName
+  val name: String
 }
 final case class PartialCmd(
-  name: CmdName,
+  name: String,
   options: Seq[OptLike] = Seq.empty,
   errors: Seq[ParseError] = Seq.empty
 ) extends CmdLike {
@@ -66,71 +61,68 @@ final case class PartialCmd(
   def withError(error: ParseError): PartialCmd = copy(errors = errors :+ error)
 }
 object PartialCmd {
-  lazy val empty = PartialCmd(CmdName(""))
-  def apply(name: String): PartialCmd = PartialCmd(CmdName(name))
+  lazy val empty = PartialCmd("")
 }
-final case class Cmd(name: CmdName, options: Seq[OptLike]) extends CmdLike {
+final case class Cmd(name: String, options: Seq[OptLike], args: Seq[String] = Seq.empty) extends CmdLike {
   def isPartial: Boolean = options.exists(_.isPartial)
 }
-final case class CmdName(name: String) extends AnyVal
 final case class Piped(commands: Seq[Cmd]) extends CmdLike {
   def isPartial: Boolean = commands.exists(_.isPartial)
-  val name: CmdName = CmdName("")
+  val name: String = ""
 }
 
 sealed trait OptLike extends Elem {
-  val name: OptName
+  val name: String
 }
-final case class PartialOpt(name: OptName, error: ParseError) extends OptLike {
+final case class PartialOpt(name: String, error: ParseError) extends OptLike {
   def isPartial: Boolean = true
 }
 object PartialOpt {
-  def apply(name: String, error: => ParseError): PartialOpt = PartialOpt(OptName(name), error)
+  def apply(name: String, error: => ParseError): PartialOpt = PartialOpt(name, error)
 }
-final case class Opt(name: OptName, value: OptValue, isPartial: Boolean) extends OptLike
+final case class Opt(name: String, value: OptValue, isPartial: Boolean) extends OptLike
 object Opt {
   def apply(name: String): Opt = Opt(name, "")
-  def apply(name: String, value: String, isPartial: Boolean): Opt = Opt(OptName(name), OptValue(value), isPartial)
+  def apply(name: String, value: String, isPartial: Boolean): Opt = Opt(name, OptValue(value), isPartial)
   def apply(name: String, value: String): Opt = Opt(name, value, isPartial = false)
 }
-final case class OptName(name: String)
 final case class OptValue(value: String)
 
 final case class CmdSet(cmdDefs: Seq[CmdDef]) {
-  def lift(cmdName: CmdName, args: Seq[String]): CmdLike = cmdDefs.find(_.name == cmdName) match {
+  def lift(name: String, args: Seq[String]): CmdLike = cmdDefs.find(_.name == name) match {
     case Some(cmdDef) => cmdDef.lift(args)
-    case _ => PartialCmd(cmdName).withError(UnknownCmdError(cmdName))
+    case _ => PartialCmd(name).withError(UnknownCmdError(name))
   }
 }
-final case class CmdDef(name: CmdName, opts: Seq[OptDef]) {
-  def lift(args: Seq[String]): CmdLike = lift(args, Seq.empty)
-  def lift(args: Seq[String], options: Seq[OptLike]): CmdLike = if (args.isEmpty) {
+final case class CmdDef(name: String, opts: Seq[OptDef]) {
+  def lift(inputs: Seq[String]): CmdLike = lift(inputs, Seq.empty, Seq.empty)
+  def lift(inputs: Seq[String], options: Seq[OptLike], args: Seq[String]): CmdLike = if (inputs.isEmpty) {
     opts.foldLeft[Seq[ParseError]](options.collect { case PartialOpt(_, err) => err }) { (errors, optDef) =>
       if (optDef.require && !options.exists(_.name == optDef.name)) errors :+ RequiredOptError()
       else errors
     } match {
-      case errors if errors.isEmpty => Cmd(name, options)
+      case errors if errors.isEmpty => Cmd(name, options, args)
       case errors => PartialCmd(name, options, errors)
     }
   } else {
-    opts.find(_.matching(args.head)) match {
+    opts.find(_.matching(inputs.head)) match {
       case Some(optDef) =>
-        optDef.lift(args.head.replaceAll("^\\-+", ""), args.tail) match {
-          case (o, t) => lift(t, options :+ o)
+        optDef.lift(inputs.head.replaceAll("^\\-+", ""), inputs.tail) match {
+          case (o, t) => lift(t, options :+ o, args)
         }
-      case _ => PartialCmd(name)
+      case _ => lift(inputs.tail, options, args :+ inputs.head)
     }
   }
 }
 object CmdDef {
-  def apply(cmdName: String): CmdDef = CmdDef(CmdName(cmdName), Seq.empty)
+  def apply(name: String): CmdDef = CmdDef(name, Seq.empty)
 }
-final case class OptDef(name: OptName, withParam: Boolean = false, require: Boolean = false) {
+final case class OptDef(name: String, withParam: Boolean = false, require: Boolean = false) {
   def lift(head: String, tail: Seq[String]): (OptLike, Seq[String]) =
     if (withParam) {
       if (tail.isEmpty) (PartialOpt(name, ParamNotFoundError), tail)
       else (Opt(head, tail.head), tail.tail)
     } else (Opt(head), tail)
-  def matching(str: String): Boolean = str.replaceAll("^\\-+", "") == name.name
+  def matching(str: String): Boolean = str.replaceAll("^\\-+", "") == name
 }
 
