@@ -20,21 +20,56 @@ object FieldSpec extends TestSuite {
 object FieldQuerySpec extends TestSuite {
   val tests = Tests {
     "object list" - {
-      TownField()
+      // TownField()
     }
   }
 }
 
 object MarketSpec extends TestSuite {
   val tests = Tests {
+    def gen(): Market = Market(MarketId(), Map.empty, Map.empty)
+    def genProduct(): Product = Product(ItemId(1), Currency(100), OnSale)
+
+    val productId1 = ProductId(1)
     "buy" - {
-      val productId1 = ProductId(1)
-      val market = Market(MarketId(), Map(productId1 -> Product(ItemId(), Currency(100), OnSale)))
-      market.buy(productId1).right.get.get(productId1).get.state ==> SoldOut
+      val market = Market(MarketId(), Map(productId1 -> genProduct()), Map.empty)
+      market.buy(productId1).right.get.product(productId1).get.state ==> SoldOut
+    }
+    "order" - {
+      val itemId = ItemId(1)
+      val market = gen()
+      "without wish list" - {
+        market.order().count(itemId) ==> 0
+      }
+      "with wish list" - {
+        market.wanted(itemId).order().count(itemId) ==> 1
+      }
+    }
+    "wanted" - {
+      val itemId = ItemId(1)
+      gen().wishList.getOrElse(itemId, 0) ==> 0
+      gen().wanted(itemId).wishList.getOrElse(itemId, 0) ==> 1
+      gen().wanted(itemId).wanted(itemId).wishList.getOrElse(itemId, 0) ==> 2
     }
     "arrive" - {
-      val market = Market(MarketId(), Map.empty)
-      market.arrive(ItemId(), Currency(10)).products.size ==> 1
+      val itemId = ItemId(1)
+      val market = gen()
+        .wanted(itemId)
+        .arrive(itemId, Currency(10))
+      market.products.size ==> 1
+      market.wishList(itemId) ==> 0
+    }
+    "delivered" - {
+      "with sold out" - {
+        val market = Market(MarketId(), Map(productId1 -> genProduct().sold), Map.empty)
+          .delivered(productId1).right.get
+        market.products.size ==> 0
+        market.wishList.size ==> 1
+      }
+      "with on sale" - {
+        val market = Market(MarketId(), Map(productId1 -> genProduct()), Map.empty)
+        market.delivered(productId1).left.get ==> ProductIsOnSale
+      }
     }
   }
 }
@@ -44,12 +79,12 @@ object PlayerSpec extends TestSuite {
     "payment" - {
       "currency lacked" - {
         Player(PlayerId(), Inventory.empty, Wallet.empty, Life(100))
-          .payment(Bill(ItemId(), Currency(100)))
+          .payment(Bill(ItemId(1), Currency(100)))
           .left.get ==> CurrencyLacked
       }
       "purchased" - {
         Player(PlayerId(), Inventory.empty, Wallet(Currency(100)), Life(100))
-          .payment(Bill(ItemId(), Currency(100)))
+          .payment(Bill(ItemId(1), Currency(100)))
           .right.get.inventory.size ==> 1
       }
     }

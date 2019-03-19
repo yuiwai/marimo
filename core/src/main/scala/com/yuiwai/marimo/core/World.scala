@@ -100,11 +100,10 @@ sealed trait Item {
 sealed trait UsableItem extends Item
 sealed trait EquipableItem extends Item
 final case class Potion(itemId: ItemId) extends UsableItem
-final case class ItemId()
+final case class ItemId(id: Int)
 
 final case class Treasure(items: Map[ItemId, Int])
 final case class TreasureBox(treasures: Seq[Treasure])
-
 
 final case class Player(playerId: PlayerId, inventory: Inventory, wallet: Wallet, life: Life)
   extends WithBattleStatus[Player] {
@@ -135,28 +134,42 @@ object Wallet {
   def empty: Wallet = Wallet(Currency.zero)
 }
 
-final case class Market(marketId: MarketId, products: Map[ProductId, Product]) {
+final case class Market(marketId: MarketId, products: Map[ProductId, Product], wishList: Map[ItemId, Int]) {
   private val ai = new AtomicInteger(0)
   private def newId() = ProductId(ai.incrementAndGet())
-  private def modified(productId: ProductId)(f: Product => Either[MarketError, Product]): Either[MarketError, Market] = get(productId) match {
+  private def modified(productId: ProductId)(f: Product => Either[MarketError, Product]): Either[MarketError, Market] = product(productId) match {
     case Some(p) => f(p).map(r => copy(products = products.updated(productId, r)))
     case None => Left(ProductNotFound)
   }
-  def get(productId: ProductId): Option[Product] = products.get(productId)
+  def product(productId: ProductId): Option[Product] = products.get(productId)
+  def wanted(itemId: ItemId): Market = copy(wishList = wishList.updated(itemId, wishList.getOrElse(itemId, 0) + 1))
+  def order(): OrderSlip = OrderSlip(wishList)
   def arrive(itemId: ItemId, price: Currency): Market = copy(
-    products = products.updated(newId(), Product(itemId, price, OnSale))
+    products = products.updated(newId(), Product(itemId, price, OnSale)),
+    wishList = wishList.updated(itemId, wishList.get(itemId).map(_ - 1).getOrElse(0))
   )
   def buy(productId: ProductId): Either[MarketError, Market] = modified(productId) {
     case p if p.onSale => Right(p.sold)
     case _ => Left(ProductAlreadySold)
+  }
+  def delivered(productId1: ProductId): Either[MarketError, Market] = product(productId1) match {
+    case Some(p) if p.soldOut =>
+      Right(copy(
+        products = products - productId1,
+        wishList = wishList.updated(p.itemId, wishList.getOrElse(p.itemId, 0) + 1))
+      )
+    case Some(p) if p.onSale => Left(ProductIsOnSale)
+    case None => Left(ProductNotFound)
   }
 }
 final case class MarketId()
 sealed trait MarketError
 case object ProductNotFound extends MarketError
 case object ProductAlreadySold extends MarketError
+case object ProductIsOnSale extends MarketError
 final case class Product(itemId: ItemId, price: Currency, state: ProductState) {
   def onSale: Boolean = state == OnSale
+  def soldOut: Boolean = state == SoldOut
   def sold: Product = copy(state = SoldOut)
 }
 sealed trait ProductState
@@ -170,6 +183,9 @@ final case class Currency private(value: Int) extends AnyVal {
   def <(that: Currency): Boolean = value < that.value
   def >=(that: Currency): Boolean = value >= that.value
   def <=(that: Currency): Boolean = value <= that.value
+}
+final case class OrderSlip(items: Map[ItemId, Int]) {
+  def count(itemId: ItemId): Int = items.getOrElse(itemId, 0)
 }
 object Currency {
   def zero: Currency = Currency(0)
@@ -209,6 +225,5 @@ trait PlayerService extends Service
 trait FieldService extends Service
 trait ItemService extends Service
 trait MarketService extends Service
-
 
 trait ActivityStream
