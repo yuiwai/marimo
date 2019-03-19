@@ -21,12 +21,27 @@ lazy val root = (project in file("."))
     webGateway
   )
 
-lazy val core = (project in file("core"))
+lazy val core = crossProject(JSPlatform, JVMPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("core"))
+  .jsSettings(
+    libraryDependencies += "com.lihaoyi" %%% "utest" % "0.6.6" % "test",
+  )
+  .jvmSettings(
+    libraryDependencies += "com.lihaoyi" %% "utest" % "0.6.6" % "test",
+  )
   .settings(
     name := "marimo-core",
-    libraryDependencies += "com.lihaoyi" %% "utest" % "0.6.6" % "test",
     testFrameworks += new TestFramework("utest.runner.Framework")
   )
+lazy val coreJVM = core.jvm
+lazy val coreJS = core.js
+
+lazy val demo = (project in file("demo"))
+  .settings(
+    name := "marimo-demo"
+  )
+  .dependsOn(coreJVM)
 
 lazy val shared = crossProject(JSPlatform, JVMPlatform)
   .crossType(CrossType.Pure)

@@ -2,8 +2,47 @@ package com.yuiwai.marimo.core
 
 import utest._
 
+object WorldSpec extends TestSuite {
+  val tests = Tests {
+    "register player" - {
+      val playerId1 = PlayerId(1)
+      val playerId2 = PlayerId(2)
+
+      "without limit" - {
+        implicit val rule: GameRule = DefaultRule
+        val world = World(Seq.empty)
+        world.registerPlayer(playerId1) match {
+          case Right(w) =>
+            w.players.size ==> 1
+            w.players(playerId1) ==> true
+            w.players(playerId2) ==> false
+        }
+        world
+          .registerPlayer(playerId1)
+          .flatMap(_.registerPlayer(playerId2)) match {
+          case Right(w) =>
+            w.players.size ==> 2
+            w.players(playerId1) ==> true
+            w.players(playerId2) ==> true
+        }
+      }
+
+      "with limit" - {
+        implicit val rule: GameRule = new GameRule {
+          override def playerLimit: Int = 1
+        }
+        val world = World(Seq.empty)
+        world
+          .registerPlayer(playerId1)
+          .flatMap(_.registerPlayer(playerId2)) ==> Left(PlayerLimitReached)
+      }
+    }
+  }
+}
+
 object FieldSpec extends TestSuite {
   val tests = Tests {
+    implicit val rule: GameRule = DefaultRule
     "left, right, up, down" - {
       val field1_1 = TownField(FieldId(Pos(1, 1)), Seq.empty)
       val field1_2 = WoodsField(FieldId(Pos(1, 2)), Seq.empty)
@@ -77,13 +116,14 @@ object MarketSpec extends TestSuite {
 object PlayerSpec extends TestSuite {
   val tests = Tests {
     "payment" - {
+      val playerId = PlayerId(1)
       "currency lacked" - {
-        Player(PlayerId(), Inventory.empty, Wallet.empty, Life(100))
+        Player(playerId, Inventory.empty, Wallet.empty, Life(100))
           .payment(Bill(ItemId(1), Currency(100)))
           .left.get ==> CurrencyLacked
       }
       "purchased" - {
-        Player(PlayerId(), Inventory.empty, Wallet(Currency(100)), Life(100))
+        Player(playerId, Inventory.empty, Wallet(Currency(100)), Life(100))
           .payment(Bill(ItemId(1), Currency(100)))
           .right.get.inventory.size ==> 1
       }
@@ -99,7 +139,7 @@ object BattleSpec extends TestSuite {
         .currentLife ==> 49
     }
     "monster attacks player" - {
-      Player(PlayerId(), Inventory.empty, Wallet.empty, Life(100))
+      Player(PlayerId(1), Inventory.empty, Wallet.empty, Life(100))
         .damaged(Attack(51))
         .currentLife ==> 49
     }

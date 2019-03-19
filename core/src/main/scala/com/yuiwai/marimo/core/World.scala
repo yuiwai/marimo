@@ -2,14 +2,30 @@ package com.yuiwai.marimo.core
 
 import java.util.concurrent.atomic.AtomicInteger
 
-final case class World(fields: Map[FieldId, Field]) {
+final case class World(fields: Map[FieldId, Field], players: Set[PlayerId])(implicit rule: GameRule) {
   require(fields.forall(f => f._1 == f._2.fieldId))
   def field(pos: Pos): Option[Field] = fields.get(FieldId(pos))
+  def registerPlayer(playerId: PlayerId): Either[WorldError, World] = {
+    if (players.size >= rule.playerLimit) Left(PlayerLimitReached)
+    else Right(copy(players = players + playerId))
+  }
 }
 object World {
-  def apply(fields: Seq[Field]): World = new World(fields.map(f => f.fieldId -> f).toMap)
-  def apply(field: Field, fields: Field*): World = apply(field +: fields)
+  def apply(fields: Seq[Field])(implicit rule: GameRule): World =
+    new World(fields.map(f => f.fieldId -> f).toMap, Set.empty)
+  def apply(field: Field, fields: Field*)(implicit rule: GameRule): World = apply(field +: fields)
 }
+trait GameRule {
+  def playerLimit: Int
+}
+trait WithDefaultRule {
+  implicit val rule: GameRule = DefaultRule
+}
+object DefaultRule extends GameRule {
+  override def playerLimit: Int = 100
+}
+sealed trait WorldError
+case object PlayerLimitReached extends WorldError
 
 final case class Pos(x: Int, y: Int) {
   require(x >= 0 && y >= 0)
@@ -113,7 +129,7 @@ final case class Player(playerId: PlayerId, inventory: Inventory, wallet: Wallet
     }
   def modifiedLife(f: Life => Life): Player = copy(life = f(life))
 }
-final case class PlayerId()
+final case class PlayerId(id: Int)
 sealed trait PlayerError
 case object CurrencyLacked extends PlayerError
 final case class Inventory(items: Set[ItemId]) {
