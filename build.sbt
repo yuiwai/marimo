@@ -17,6 +17,7 @@ lazy val root = (project in file("."))
     worldApi, worldImpl,
     playerApi, playerImpl,
     fieldApi, fieldImpl,
+    marketApi, marketImpl,
     webGateway
   )
 
@@ -132,6 +133,27 @@ lazy val fieldImpl = (project in file("field-impl"))
   .enablePlugins(LagomScala)
   .dependsOn(fieldApi)
 
+lazy val marketApi = (project in file("market-api"))
+  .settings(
+    name := "market-api",
+    libraryDependencies ++= Seq(
+      lagomScaladslApi,
+      playJsonDerivedCodecs
+    )
+  )
+
+lazy val marketImpl = (project in file("market-impl"))
+  .settings(
+    name := "market-impl",
+    libraryDependencies ++= Seq(
+      macwire,
+      lagomScaladslPersistenceCassandra,
+      lagomScaladslTestKit,
+      scalaTest
+    )
+  )
+  .enablePlugins(LagomScala)
+  .dependsOn(marketApi)
 
 lazy val webGateway = (project in file("web-gateway"))
   .enablePlugins(PlayScala, LagomPlay, WebScalaJSBundlerPlugin, SbtReactiveAppPlugin)
