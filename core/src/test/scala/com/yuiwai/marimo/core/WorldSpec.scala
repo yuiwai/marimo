@@ -1,5 +1,6 @@
 package com.yuiwai.marimo.core
 
+import com.yuiwai.marimo.core.World.RegistrationRequested
 import utest._
 
 object WorldSpec extends TestSuite {
@@ -12,18 +13,20 @@ object WorldSpec extends TestSuite {
         implicit val rule: GameRule = DefaultRule
         val world = World(Seq.empty)
         world.registerPlayer(playerId1) match {
-          case Right(w) =>
+          case Right((w, _)) =>
             w.players.size ==> 1
-            w.players(playerId1) ==> true
-            w.players(playerId2) ==> false
+            w.players(playerId1) ==> RegistrationRequested
+            w.players.get(playerId2) ==> None
+          case _ => assert(false)
         }
         world
           .registerPlayer(playerId1)
-          .flatMap(_.registerPlayer(playerId2)) match {
-          case Right(w) =>
+          .flatMap(_._1.registerPlayer(playerId2)) match {
+          case Right((w, _)) =>
             w.players.size ==> 2
-            w.players(playerId1) ==> true
-            w.players(playerId2) ==> true
+            w.players(playerId1) ==> RegistrationRequested
+            w.players(playerId2) ==> RegistrationRequested
+          case _ => assert(false)
         }
       }
 
@@ -31,10 +34,26 @@ object WorldSpec extends TestSuite {
         implicit val rule: GameRule = new GameRule {
           override def playerLimit: Int = 1
         }
-        val world = World(Seq.empty)
-        world
+        World.empty
           .registerPlayer(playerId1)
-          .flatMap(_.registerPlayer(playerId2)) ==> Left(PlayerLimitReached)
+          .flatMap(_._1.registerPlayer(playerId2)) ==> Left(PlayerLimitReached)
+      }
+    }
+    "accepted player" - {
+      implicit val rule: GameRule = DefaultRule
+      val player1 = Player.empty(1)
+      "without target player" - {
+        World.empty
+          .acceptedPlayer(player1.playerId) ==> Left(PlayerNotFound)
+      }
+      "with target player" - {
+        World.empty
+          .registerPlayer(player1.playerId)
+          .flatMap(_._1.acceptedPlayer(player1.playerId)) match {
+          case Right((_, e)) =>
+            e ==> PlayerRegistered(player1.playerId)
+          case _ => assert(false)
+        }
       }
     }
   }
@@ -66,12 +85,13 @@ object FieldQuerySpec extends TestSuite {
 
 object MarketSpec extends TestSuite {
   val tests = Tests {
-    def gen(): Market = Market(MarketId(), Map.empty, Map.empty)
+    val marketId = MarketId(1)
+    def gen(): Market = Market(marketId, Map.empty, Map.empty)
     def genProduct(): Product = Product(ItemId(1), Currency(100), OnSale)
 
     val productId1 = ProductId(1)
     "buy" - {
-      val market = Market(MarketId(), Map(productId1 -> genProduct()), Map.empty)
+      val market = Market(marketId, Map(productId1 -> genProduct()), Map.empty)
       market.buy(productId1).right.get.product(productId1).get.state ==> SoldOut
     }
     "order" - {
@@ -100,13 +120,13 @@ object MarketSpec extends TestSuite {
     }
     "delivered" - {
       "with sold out" - {
-        val market = Market(MarketId(), Map(productId1 -> genProduct().sold), Map.empty)
+        val market = Market(marketId, Map(productId1 -> genProduct().sold), Map.empty)
           .delivered(productId1).right.get
         market.products.size ==> 0
         market.wishList.size ==> 1
       }
       "with on sale" - {
-        val market = Market(MarketId(), Map(productId1 -> genProduct()), Map.empty)
+        val market = Market(marketId, Map(productId1 -> genProduct()), Map.empty)
         market.delivered(productId1).left.get ==> ProductIsOnSale
       }
     }

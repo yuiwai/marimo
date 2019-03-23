@@ -2,19 +2,43 @@ package com.yuiwai.marimo.core
 
 import java.util.concurrent.atomic.AtomicInteger
 
-final case class World(fields: Map[FieldId, Field], players: Set[PlayerId])(implicit rule: GameRule) {
+import com.yuiwai.marimo.core.World.{PlayerStatus, Registered, RegistrationRequested, Rejected}
+
+final case class World(fields: Map[FieldId, Field], players: Map[PlayerId, PlayerStatus])(implicit rule: GameRule) {
   require(fields.forall(f => f._1 == f._2.fieldId))
   def field(pos: Pos): Option[Field] = fields.get(FieldId(pos))
-  def registerPlayer(playerId: PlayerId): Either[WorldError, World] = {
-    if (players.size >= rule.playerLimit) Left(PlayerLimitReached)
-    else Right(copy(players = players + playerId))
+  def registerPlayer(playerId: PlayerId): Either[WorldError, (World, WorldEvent)] = {
+    if (players.count(_._2 != Rejected) >= rule.playerLimit) Left(PlayerLimitReached)
+    else Right(copy(players = players + (playerId -> RegistrationRequested)), PlayerRegistrationRequested(playerId))
+  }
+  def acceptedPlayer(playerId: PlayerId): Either[WorldError, (World, WorldEvent)] = players.get(playerId) match {
+    case Some(s) =>
+      if (s == RegistrationRequested)
+        Right(copy(players = players.updated(playerId, Registered)) -> PlayerRegistered(playerId))
+      else Left(PlayerAlreadyRegistered)
+    case None => Left(PlayerNotFound)
   }
 }
 object World {
+  sealed trait PlayerStatus
+  case object RegistrationRequested extends PlayerStatus
+  case object Registered extends PlayerStatus
+  case object Rejected extends PlayerStatus
+  def empty(implicit rule: GameRule): World = apply(Seq.empty)
   def apply(fields: Seq[Field])(implicit rule: GameRule): World =
-    new World(fields.map(f => f.fieldId -> f).toMap, Set.empty)
+    new World(fields.map(f => f.fieldId -> f).toMap, Map.empty)
   def apply(field: Field, fields: Field*)(implicit rule: GameRule): World = apply(field +: fields)
 }
+final case class WorldId(id: Int)
+sealed trait WorldEvent
+final case class PlayerRegistrationRequested(playerId: PlayerId) extends WorldEvent
+final case class PlayerRegistered(playerId: PlayerId) extends WorldEvent
+
+sealed trait WorldError extends WorldEvent
+case object PlayerLimitReached extends WorldError
+case object PlayerNotFound extends WorldError
+case object PlayerAlreadyRegistered extends WorldError
+
 trait GameRule {
   def playerLimit: Int
 }
@@ -24,8 +48,6 @@ trait WithDefaultRule {
 object DefaultRule extends GameRule {
   override def playerLimit: Int = 100
 }
-sealed trait WorldError
-case object PlayerLimitReached extends WorldError
 
 final case class Pos(x: Int, y: Int) {
   require(x >= 0 && y >= 0)
@@ -129,6 +151,9 @@ final case class Player(playerId: PlayerId, inventory: Inventory, wallet: Wallet
     }
   def modifiedLife(f: Life => Life): Player = copy(life = f(life))
 }
+object Player {
+  def empty(id: Int): Player = apply(PlayerId(id), Inventory.empty, Wallet.empty, Life(100))
+}
 final case class PlayerId(id: Int)
 sealed trait PlayerError
 case object CurrencyLacked extends PlayerError
@@ -178,8 +203,14 @@ final case class Market(marketId: MarketId, products: Map[ProductId, Product], w
     case None => Left(ProductNotFound)
   }
 }
-final case class MarketId()
-sealed trait MarketError
+object Market {
+  def apply(marketId: MarketId): Market = Market(marketId, Map.empty, Map.empty)
+  def empty(id: Int): Market = Market(MarketId(id))
+}
+final case class MarketId(id: Int)
+sealed trait MarketEvent
+final case class ProductPurchased(productId: ProductId /*, playerId: PlayerId */) extends MarketEvent
+sealed trait MarketError extends MarketEvent
 case object ProductNotFound extends MarketError
 case object ProductAlreadySold extends MarketError
 case object ProductIsOnSale extends MarketError
