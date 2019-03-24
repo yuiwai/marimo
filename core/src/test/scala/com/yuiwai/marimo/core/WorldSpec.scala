@@ -86,7 +86,9 @@ object FieldQuerySpec extends TestSuite {
 object MarketSpec extends TestSuite {
   val tests = Tests {
     val marketId = MarketId(1)
+
     def gen(): Market = Market(marketId, Map.empty, Map.empty)
+
     def genProduct(): Product = Product(ItemId(1), Currency(100), OnSale)
 
     val productId1 = ProductId(1)
@@ -112,7 +114,7 @@ object MarketSpec extends TestSuite {
     }
     "arrive" - {
       val itemId = ItemId(1)
-      val market = gen()
+      val (market, _) = gen()
         .wanted(itemId)
         .arrive(itemId, Currency(10))
       market.products.size ==> 1
@@ -127,7 +129,7 @@ object MarketSpec extends TestSuite {
       }
       "with on sale" - {
         val market = Market(marketId, Map(productId1 -> genProduct()), Map.empty)
-        market.delivered(productId1).left.get ==> ProductIsOnSale
+        market.delivered(productId1).left.get ==> ProductIsOnSale(marketId)
       }
     }
   }

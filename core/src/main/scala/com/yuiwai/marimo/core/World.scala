@@ -180,18 +180,21 @@ final case class Market(marketId: MarketId, products: Map[ProductId, Product], w
   private def newId() = ProductId(ai.incrementAndGet())
   private def modified(productId: ProductId)(f: Product => Either[MarketError, Product]): Either[MarketError, Market] = product(productId) match {
     case Some(p) => f(p).map(r => copy(products = products.updated(productId, r)))
-    case None => Left(ProductNotFound)
+    case None => Left(ProductNotFound(marketId))
   }
   def product(productId: ProductId): Option[Product] = products.get(productId)
   def wanted(itemId: ItemId): Market = copy(wishList = wishList.updated(itemId, wishList.getOrElse(itemId, 0) + 1))
   def order(): OrderSlip = OrderSlip(wishList)
-  def arrive(itemId: ItemId, price: Currency): Market = copy(
-    products = products.updated(newId(), Product(itemId, price, OnSale)),
-    wishList = wishList.updated(itemId, wishList.get(itemId).map(_ - 1).getOrElse(0))
-  )
+  def arrive(itemId: ItemId, price: Currency): (Market, ProductId) = {
+    val productId = newId()
+    copy(
+      products = products.updated(productId, Product(itemId, price, OnSale)),
+      wishList = wishList.updated(itemId, wishList.get(itemId).map(_ - 1).getOrElse(0))
+    ) -> productId
+  }
   def buy(productId: ProductId): Either[MarketError, Market] = modified(productId) {
     case p if p.onSale => Right(p.sold)
-    case _ => Left(ProductAlreadySold)
+    case _ => Left(ProductAlreadySold(marketId))
   }
   def delivered(productId1: ProductId): Either[MarketError, Market] = product(productId1) match {
     case Some(p) if p.soldOut =>
@@ -199,8 +202,8 @@ final case class Market(marketId: MarketId, products: Map[ProductId, Product], w
         products = products - productId1,
         wishList = wishList.updated(p.itemId, wishList.getOrElse(p.itemId, 0) + 1))
       )
-    case Some(p) if p.onSale => Left(ProductIsOnSale)
-    case None => Left(ProductNotFound)
+    case Some(p) if p.onSale => Left(ProductIsOnSale(marketId))
+    case None => Left(ProductNotFound(marketId))
   }
 }
 object Market {
@@ -208,12 +211,15 @@ object Market {
   def empty(id: Int): Market = Market(MarketId(id))
 }
 final case class MarketId(id: Int)
-sealed trait MarketEvent
-final case class ProductPurchased(productId: ProductId /*, playerId: PlayerId */) extends MarketEvent
+sealed trait MarketEvent {
+  val marketId: MarketId
+}
+final case class ProductPurchased(marketId: MarketId, productId: ProductId /*, playerId: PlayerId */) extends MarketEvent
+final case class ItemArrived(marketId: MarketId, productId: ProductId) extends MarketEvent
 sealed trait MarketError extends MarketEvent
-case object ProductNotFound extends MarketError
-case object ProductAlreadySold extends MarketError
-case object ProductIsOnSale extends MarketError
+final case class ProductNotFound(marketId: MarketId) extends MarketError
+final case class ProductAlreadySold(marketId: MarketId) extends MarketError
+final case class ProductIsOnSale(marketId: MarketId) extends MarketError
 final case class Product(itemId: ItemId, price: Currency, state: ProductState) {
   def onSale: Boolean = state == OnSale
   def soldOut: Boolean = state == SoldOut

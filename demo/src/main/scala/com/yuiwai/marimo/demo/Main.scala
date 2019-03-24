@@ -12,6 +12,7 @@ object Main extends AnyRef
   val player1 = Player(PlayerId(1), Inventory.empty, Wallet.empty, Life(100))
   val marketId1 = MarketId(1)
   val productId1 = ProductId(1)
+  val itemId1 = ItemId(1)
   def main(args: Array[String]): Unit = {
     worldScenario()
     purchaseScenario()
@@ -22,6 +23,7 @@ object Main extends AnyRef
   def purchaseScenario(): Unit = {
     MarketBehavior.purchase(marketId1, productId1).foreach(println)
     MarketBehavior.purchase2(marketId1, productId1).foreach(println)
+    MarketBehavior.arrive(marketId1, itemId1, Currency(100)).foreach(println)
   }
 }
 
@@ -42,11 +44,12 @@ trait ActWithResolve[State] {
       resolver: Resolver[F, Id, State],
       action: Action[State, Command]
     ): F[Option[(State, Action[State, Command]#Event)]] = {
-    implicitly[Functor[F]].map[Option[State], Option[(State, Action[State, Command]#Event)]](resolve(id), _.map(s => act(s, command)))
+    implicitly[Functor[F]]
+      .map[Option[State], Option[(State, Action[State, Command]#Event)]](resolve(id))(_.map(s => act(s, command)))
   }
 }
 trait Functor[F[_]] {
-  def map[A, B](fa: F[A], f: A => B): F[B]
+  def map[A, B](fa: F[A])(f: A => B): F[B]
 }
 
 trait WorldBehavior extends Behavior[World] {
@@ -86,13 +89,21 @@ trait MarketBehavior extends Behavior[Market] with ActWithResolve[Market] {
     override type Event = MarketEvent
     override def apply(market: Market, command: PurchaseCommand): (Market, MarketEvent) = {
       market.buy(command.productId) match {
-        case Right(m) => m -> ProductPurchased(command.productId)
+        case Right(m) => m -> ProductPurchased(m.marketId, command.productId)
         case Left(e) => market -> e
       }
     }
   }
+  implicit val arriveItemAction = new Action[Market, ArriveItemCommand] {
+    override type Event = MarketEvent
+    override def apply(market: Market, command: ArriveItemCommand): (Market, Event) = {
+      market.arrive(command.itemId, command.price) match {
+        case (market, productId) => market -> ItemArrived(market.marketId, productId)
+      }
+    }
+  }
   implicit val future = new Functor[Future] {
-    override def map[A, B](fa: Future[A], f: A => B): Future[B] = fa.map(f)
+    override def map[A, B](fa: Future[A])(f: A => B): Future[B] = fa.map(f)
   }
   def productList(marketId: MarketId): Future[Option[String]] = resolve(marketId).map(_.map(reply(_)))
   def purchase(marketId: MarketId, productId: ProductId): Future[Option[(Market, MarketEvent)]] = {
@@ -101,11 +112,15 @@ trait MarketBehavior extends Behavior[Market] with ActWithResolve[Market] {
   def purchase2(marketId: MarketId, productId: ProductId): Future[Option[(Market, Action[Market, PurchaseCommand]#Event)]] = {
     actWithResolve(marketId, PurchaseCommand(productId))
   }
+  def arrive(marketId: MarketId, itemId: ItemId, price: Currency): Future[Option[(Market, Action[Market, ArriveItemCommand]#Event)]] = {
+    actWithResolve(marketId, ArriveItemCommand(itemId, price))
+  }
 }
 object MarketBehavior extends MarketBehavior
 
 sealed trait MarketCommand
 final case class PurchaseCommand(productId: ProductId) extends MarketCommand
+final case class ArriveItemCommand(itemId: ItemId, price: Currency) extends MarketCommand
 
 trait Action[State, Command] {
   type Event
